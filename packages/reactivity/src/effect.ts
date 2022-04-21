@@ -14,7 +14,7 @@ export class ReactiveEffect {
     public parent = null;
     public deps = []
     public active = true; // 这个effect默认是激活状态
-    constructor(public fn,public scheduler?){} // 用户传递的参数也会当this上 this.fn = fn
+    constructor(public fn,public scheduler){} // 用户传递的参数也会当this上 this.fn = fn
     run(){ // run就是执行effect
         if(!this.active){ return this.fn()}; // 这里表示如果是非激活的情况，只需要执行函数，不需要进行依赖收集
         // 这里就要依赖收集了  核心就是将当前的effect 和 稍后渲染的属性关联在一起

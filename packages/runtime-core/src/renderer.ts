@@ -1,9 +1,5 @@
-import { reactive } from "@vue/reactivity";
 import { isArray, isString, ShapeFlags } from "@vue/shared";
-import { ReactiveEffect } from "@vue/reactivity";
-import { getSequence } from "./sequence";
-import { Text ,createVnode,isSameVnode,Fragment} from "./vnode";
-import { queueJob } from "./scheduler";
+import { Text ,createVnode,isSameVnode} from "./vnode";
 
 
 
@@ -150,9 +146,6 @@ export function createRenderer(renderOptions){
         // 循环老的元素 看一下新的里面有没有，如果有说明要比较差异，没有要添加到列表中，老的有新的没有要删除
         const toBePatched = e2 - s2 + 1; // 新的总个数
         const newIndexToOldIndexMap = new Array(toBePatched).fill(0); // 一个记录是否比对过的映射表 
-
-       
-        
         for(let i = s1; i<=e1; i++){
             const oldChild = c1[i]; // 老的孩子
             let newIndex =  keyToNewIndexMap.get(oldChild.key); // 用老的孩子去新的里面找
@@ -165,28 +158,24 @@ export function createRenderer(renderOptions){
             }
         } // 到这这是新老属性和儿子的比对，没有移动位置
         
-
-         // 获取最长递增子序列
-         let increment = getSequence(newIndexToOldIndexMap)
-
+        
         // 需要移动位置
-        let j = increment.length - 1;
-        for(let i =toBePatched - 1; i>=0; i-- ){ // 3 2 1 0
+        for(let i =toBePatched - 1; i>=0; i-- ){
             let index = i + s2;
             let current = c2[index]; // 找到h
             let anchor = index + 1 < c2.length ? c2[index+1].el : null;
-            if(newIndexToOldIndexMap[i] === 0){ // 创建   [5 3 4 0]  -> [1,2]
+            if(newIndexToOldIndexMap[i] === 0){ // 创建   5 3 4 0
                 patch(null,current,el,anchor)
             }else{ // 不是0 说明是已经比对过属性和儿子的了
-                if(i !=  increment[j] ){
-                    hostInsert(current.el,el,anchor); // 目前无论如何都做了一遍倒叙插入，其实可以不用的， 可以根据刚才的数组来减少插入次数 
-                }else{
-                    j--;
-                }
+                hostInsert(current.el,el,anchor); // 目前无论如何都做了一遍倒叙插入，其实可以不用的， 可以根据刚才的数组来减少插入次数 
             }
+
            // 这里发现缺失逻辑 我需要看一下current有没有el。如果没有el说明是新增的逻辑
+
            // 最长递增子序列来实现  vue2 在移动元素的时候会有浪费  优化
         }
+
+
     }
     const patchChildren = (n1,n2,el) =>{
         // 比较两个虚拟节点的儿子的差异 ， el就是当前的父节点
@@ -246,50 +235,6 @@ export function createRenderer(renderOptions){
            patchElement(n1,n2)
         }
     }
-    const processFragment = (n1,n2,container) =>{
-        if(n1 == null){
-            mountChildren(n2.children,container)
-        }else{
-            patchChildren(n1,n2,container); // 走的是diff算法
-        }   
-    }
-    const mountComponent = (vnode,container,anchor) =>{
-        let {data=()=>({}),render} = vnode.type; // 这个就是用户写的内容
-        const state = reactive(data()); // pinia 源码就是 reactive({})  作为组件的状态
-
-        const instance = { // 组件的实例
-            state,
-            vnode,  // vue2的源码中组件的虚拟节点叫$vnode  渲染的内容叫_vnode
-            subTree:null, // vnode组件的虚拟节点   subTree渲染的组件内容
-            isMounted:false,
-            update:null,
-        }
-        const componentUpdateFn = () =>{ // 区分是初始化 还是要更新
-            if(!instance.isMounted){ // 初始化
-                const subTree = render.call(state); // 作为this，后续this会改
-                patch(null,subTree,container,anchor); // 创造了subTree的真实节点并且插入了
-                instance.subTree = subTree;
-                instance.isMounted = true
-            }else{ // 组件内部更新
-                const subTree = render.call(state);
-                patch(instance.subTree,subTree,container,anchor);
-                instance.subTree = subTree;
-            }
-        }
-        // 组件的异步更新
-        const effect = new ReactiveEffect(componentUpdateFn,()=> queueJob(instance.update))
-        // 我们将组件强制更新的逻辑保存到了组件的实例上，后续可以使用
-        let update = instance.update = effect.run.bind(effect); // 调用effect.run可以让组件强制重新渲染
-        update();
-
-    }
-    const processComponent = (n1,n2,container,anchor) =>{ // 统一处理组件， 里面在区分是普通的还是 函数式组件
-        if(n1 == null){
-            mountComponent(n2,container,anchor);
-        }else{  
-            // 组件更新靠的是props
-        }
-    }
     const patch = (n1,n2,container,anchor = null) => { //  核心的patch方法
         if(n1 === n2) return;
         if(n1 && !isSameVnode(n1,n2)){ // 判断两个元素是否相同，不相同卸载在添加
@@ -300,16 +245,10 @@ export function createRenderer(renderOptions){
         switch(type){
             case Text:
                 processText(n1,n2,container);
-                break;
-            case Fragment: // 无用的标签
-                processFragment(n1,n2,container);
-                break;
+              break;
             default:
                 if(shapeFlag & ShapeFlags.ELEMENT){
                     processElement(n1,n2,container,anchor);
-                }else if(shapeFlag & ShapeFlags.COMPONENT){
-                    // 文档只能在你会的时候看，不会的时候很难看懂
-                    processComponent(n1,n2,container,anchor)
                 }
         }
     }
