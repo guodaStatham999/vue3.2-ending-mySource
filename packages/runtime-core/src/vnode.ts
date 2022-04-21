@@ -1,8 +1,9 @@
 
 // type  props  children
 
-import { isArray, isString, ShapeFlags } from "@vue/shared";
+import { isArray, isObject, isString, ShapeFlags } from "@vue/shared";
 export const Text = Symbol('Text')
+export const Fragment = Symbol('Fragment')
 export function isVnode(value){
     return !!(value && value.__v_isVnode)
 }
@@ -12,8 +13,8 @@ export function isSameVnode(n1,n2){ // 判断两个虚拟节点是否是相同�
 }
 // 虚拟节点有很多：组件的、元素的、文本的   h('h1')
 export function createVnode(type,props,children = null){
-    // 组合方案 shapeFlag  我想知道一个元素中包含的是多个儿子还是一个儿子  标识 
-    let shapeFlag = isString(type) ? ShapeFlags.ELEMENT : 0;
+    // 组合方案 shapeFlag  我想知道一个元素中包含的是多个儿子还是一个儿子  标识  
+    let shapeFlag = isString(type) ? ShapeFlags.ELEMENT :isObject(type)?ShapeFlags.STATEFUL_COMPONENT: 0; // 字符串 'div' 就是元素,如果是对象就是带状态的组件
     // 虚拟dom就是一个对象，diff算法。 真实dom的属性比较多
     const vnode = { // key
         type,

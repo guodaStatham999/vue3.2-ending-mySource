@@ -1,5 +1,8 @@
+import { ReactiveEffect } from "@vue/reactivity";
+import { reactive } from "@vue/reactivity";
 import { isArray, isString, ShapeFlags } from "@vue/shared";
-import { Text ,createVnode,isSameVnode} from "./vnode";
+
+import { Text ,createVnode,isSameVnode, Fragment} from "./vnode";
 
 
 
@@ -235,6 +238,42 @@ export function createRenderer(renderOptions){
            patchElement(n1,n2)
         }
     }
+    const processFragment = (n1,n2,container) =>{
+        if(n1 == null){
+            mountChildren(n2.children,container)
+        }else{
+            patchChildren(n1,n2,container); // 走的是diff算法
+        }   
+    }
+
+    let mountComponent = (vnode,container,anchor) =>{
+        let { 
+            data =()=>({}), // 这个是默认值是个对象,需要编程响应式
+            render
+         } = vnode.type; // 这个就是用户写的内容
+        console.log(vnode.type);
+        let state = reactive(data()); // 函数执行后是个对象,就可以使用reactive => pinia的核心就是 reactive对数据进行包裹就行.  作为组件的状态
+        debugger
+        let instance = { // 组件的实例 => 有些属性不能只是记录在虚拟节点上,而是用组件实例来记录
+            state, // 组件的状态
+            vnode, // 组件的虚拟节点
+            subTree:null, // 组件的render执行结果(最终渲染的样子),就在这里存储   => vue2的源码节点中: 虚拟节点叫$vnode,渲染内容叫_vnode.很绕  但是vue3改成了subTree(也就是渲染结果叫 渲染子节点)
+            isMounted: false, // 是否挂载成功
+            // props,
+            // attrs,
+            // proxy
+        } // 需要做成响应式,就用 effect
+        let effect = new ReactiveEffect()
+    }
+
+    let processComponent = (n1, n2, container,anchor) =>{ // 组件的更新/渲染 => 这里面区分函数式组件/状态组件 函数式组件是vue2的性能好且多节点 .但是到了vue3已经优化成了状态组件性能忽略不计且也可以多节点,所以多使用状态组件.
+        if(n1 == null){ // 新增
+            mountComponent(n2,container,anchor)
+        }else{ // 更新更新靠的props
+
+        }
+        
+    }
     const patch = (n1,n2,container,anchor = null) => { //  核心的patch方法
         if(n1 === n2) return;
         if(n1 && !isSameVnode(n1,n2)){ // 判断两个元素是否相同，不相同卸载在添加
@@ -246,9 +285,14 @@ export function createRenderer(renderOptions){
             case Text:
                 processText(n1,n2,container);
               break;
+            case Fragment:
+                processFragment(n1, n2, container);
+            break;
             default:
                 if(shapeFlag & ShapeFlags.ELEMENT){
                     processElement(n1,n2,container,anchor);
+                }else if(shapeFlag & ShapeFlags.COMPONENT){
+                    processComponent(n1, n2, container,anchor); // 组件的更新&&组件的渲染处理函数
                 }
         }
     }
