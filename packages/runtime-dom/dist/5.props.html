@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <div id="app"></div>
+    <!-- 官方版本 -->
+    <!-- <script src="../../../node_modules/@vue/runtime-dom/dist//runtime-dom.global.js"></script>  -->
+    <!-- <script src="../../../node_modules/@vue/runtime-dom/dist//runtime-dom.global.prod.js"></script>  -->
+    <!-- <script src="../../../node_modules/@vue/runtime-core/dist//runtime-core.global.js"></script>  -->
+    <!-- 自己写的 -->
+    <script src="./runtime-dom.global.js"></script>
+    <script>
+        let {createRenderer,h,render,Text,Fragment} = VueRuntimeDOM
+
+        /* 
+        组件三大特性 : 
+        1.props(属性) 属性变化,属性如何更新 
+        2.插槽 
+        3.事件
+        */
+       alert(222)
+        const VueComponent  = {
+            props:{
+                address:String, // 校验属性类型
+                c:{
+                    n:0
+                }
+            },
+            // // template
+            render(){ // render函数需要返回虚拟节点，最终渲染的就是返回的虚拟节点   effect  reactive
+                console.log(this.c);
+                console.log(this.c.n);
+                // this.address = 'wwws' // 不能修改
+                return h('p',this.address + this.$attrs.a + this.$attrs.b);
+            }
+        }
+        render(h(VueComponent,{address:'霍营地铁',a:1,b:2,c:{n:122}}),app);
+
+     
+
+    </script>
+</body>
+</html>
