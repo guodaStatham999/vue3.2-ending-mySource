@@ -163,6 +163,28 @@ var VueRuntimeDOM = (() => {
     return proxy;
   }
 
+  // packages/runtime-core/src/scheduler.ts
+  var queue = [];
+  var isFlushing = false;
+  var resolvePromise = Promise.resolve();
+  function queneJob(job) {
+    if (!queue.includes(job)) {
+      queue.push(job);
+    }
+    if (!isFlushing) {
+      isFlushing = true;
+      resolvePromise.then(() => {
+        isFlushing = false;
+        let copy = queue.slice(0);
+        queue.length = 0;
+        copy.forEach((item) => {
+          item();
+        });
+        copy.length = 0;
+      });
+    }
+  }
+
   // packages/runtime-core/src/vnode.ts
   var Text = Symbol("Text");
   var Fragment = Symbol("Fragment");
@@ -388,16 +410,30 @@ var VueRuntimeDOM = (() => {
         data = () => ({}),
         render: render3
       } = vnode.type;
-      console.log(vnode.type);
       let state = reactive(data());
-      debugger;
       let instance = {
         state,
         vnode,
         subTree: null,
-        isMounted: false
+        isMounted: false,
+        update: null
       };
-      let effect2 = new ReactiveEffect();
+      let componentUpdateFn = () => {
+        console.log("\u66F4\u65B0");
+        if (!instance.isMounted) {
+          let subTree = render3.call(state);
+          patch(null, subTree, container, anchor);
+          instance.subTree = subTree;
+          instance.isMounted = true;
+        } else {
+          let subTree = render3.call(state);
+          patch(instance.subTree, subTree, container, anchor);
+          instance.subTree = subTree;
+        }
+      };
+      let effect2 = new ReactiveEffect(componentUpdateFn, () => queneJob(instance.update));
+      let update = instance.update = effect2.run.bind(effect2);
+      update();
     };
     let processComponent = (n1, n2, container, anchor) => {
       if (n1 == null) {

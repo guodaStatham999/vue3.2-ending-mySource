@@ -22,7 +22,7 @@
             render(){ // render函数需要返回虚拟节点，最终渲染的就是返回的虚拟节点   effect  reactive
                 setTimeout(()=>{
                     this.age++
-                    this.name += '1'
+                    this.name +=1;
                 },1000)
                 return h('p',`${this.name}今年${this.age}岁了`);
             }

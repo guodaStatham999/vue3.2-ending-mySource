@@ -1,6 +1,7 @@
 import { ReactiveEffect } from "@vue/reactivity";
 import { reactive } from "@vue/reactivity";
 import { isArray, isString, ShapeFlags } from "@vue/shared";
+import { queneJob } from "./scheduler";
 
 import { Text ,createVnode,isSameVnode, Fragment} from "./vnode";
 
@@ -251,19 +252,39 @@ export function createRenderer(renderOptions){
             data =()=>({}), // 这个是默认值是个对象,需要编程响应式
             render
          } = vnode.type; // 这个就是用户写的内容
-        console.log(vnode.type);
         let state = reactive(data()); // 函数执行后是个对象,就可以使用reactive => pinia的核心就是 reactive对数据进行包裹就行.  作为组件的状态
-        debugger
         let instance = { // 组件的实例 => 有些属性不能只是记录在虚拟节点上,而是用组件实例来记录
             state, // 组件的状态
             vnode, // 组件的虚拟节点
             subTree:null, // 组件的render执行结果(最终渲染的样子),就在这里存储   => vue2的源码节点中: 虚拟节点叫$vnode,渲染内容叫_vnode.很绕  但是vue3改成了subTree(也就是渲染结果叫 渲染子节点)
             isMounted: false, // 是否挂载成功
+            update:null, // 组件自身的强制更新方法 => effect.run方法
             // props,
             // attrs,
             // proxy
         } // 需要做成响应式,就用 effect
-        let effect = new ReactiveEffect()
+
+        let componentUpdateFn = () =>{ // 传入响应式的方法,既有初始化,又有更新方法. 响应式是需要个函数,等到触发的时候要调用.
+            console.log('更新');
+            
+            if(!instance.isMounted){ // 初始化
+                let subTree = render.call(state); // 保存this,后续要改
+                patch(null,subTree,container,anchor); // subTree就是虚拟节点. 使用patch挂载后就是真实节点,并且插入了.
+                instance.subTree = subTree;
+
+                instance.isMounted = true
+            }else{ // 组件内部更新 
+                let subTree = render.call(state);
+                patch(instance.subTree,subTree,container,anchor); // 1. 老树就是实例上的树,新树就是从新new的树 patch会自动diff算法 
+                instance.subTree = subTree;
+                
+            }
+        }
+        let effect = new ReactiveEffect(componentUpdateFn,()=>queneJob(instance.update)); // queneJob是因为如果多个单个响应式,两次触发的话. 会渲染两次,所以会使用异步缓存机制存储任务队列,等到异步以后再触发渲染.
+        
+        // 将组件强制更新的逻辑,保存到实例上. 后续可以使用.
+        let update = instance.update = effect.run.bind(effect); // 默认不执行,需要默认执行一次. 且会让组件强制重新渲染
+        update()
     }
 
     let processComponent = (n1, n2, container,anchor) =>{ // 组件的更新/渲染 => 这里面区分函数式组件/状态组件 函数式组件是vue2的性能好且多节点 .但是到了vue3已经优化成了状态组件性能忽略不计且也可以多节点,所以多使用状态组件.
