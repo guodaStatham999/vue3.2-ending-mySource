@@ -17,28 +17,36 @@
     <script>
         let {createRenderer,h,render,Text,Fragment} = VueRuntimeDOM
 
-        /* 
-        组件三大特性 : 
-        1.props(属性) 属性变化,属性如何更新 
-        2.插槽 
-        3.事件
-        */
-        const VueComponent  = {
+        // 根据传入属性,子组件也要更新
+        // 其实就是组件更新的逻辑
+
+        let myComponent = {
             props:{
-                address:String, // 校验属性类型
-                c:{
-                    n:0
-                }
+                address:String
             },
-            // // template
-            render(){ // render函数需要返回虚拟节点，最终渲染的就是返回的虚拟节点   effect  reactive
-                console.log(this.c);
-                console.log(this.c.n);
-                // this.address = 'wwws' // 不能修改
-                return h('p',this.address + this.$attrs.a + this.$attrs.b);
+            render(){
+                return h(Text,this.address)
             }
         }
-        render(h(VueComponent,{address:'霍营地铁',a:1,b:2,c:{n:122}}),app);
+
+        const VueComponent  = {
+            data(){
+               return {
+                    flag:false, // 校验属性类型
+                    c:{
+                        n:0
+                    }
+               }
+            },
+
+            render(){ 
+                return h(Fragment,[
+                    h('button',{onClick:()=>this.flag = !this.flag},'切换组件'),
+                    h(myComponent,{address:this.flag? '地球-真':'月球-假'})
+                ]);
+            }
+        }
+        render(h(VueComponent),app);
  
      
 

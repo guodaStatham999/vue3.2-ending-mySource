@@ -1,3 +1,4 @@
+import { reactive } from "@vue/reactivity";
 import { hasOwn, isFunction } from "@vue/shared";
 import { initProps } from "./componentProps";
 

@@ -136,7 +136,7 @@ var VueRuntimeDOM = (() => {
       track(target, "get", key);
       let res = Reflect.get(target, key, receiver);
       if (isObject(res)) {
-        return reactive2(res);
+        return reactive(res);
       }
       return res;
     },
@@ -152,7 +152,7 @@ var VueRuntimeDOM = (() => {
 
   // packages/reactivity/src/reactive.ts
   var reactiveMap = /* @__PURE__ */ new WeakMap();
-  function reactive2(target) {
+  function reactive(target) {
     if (!isObject(target)) {
       return;
     }
@@ -183,8 +183,32 @@ var VueRuntimeDOM = (() => {
         }
       }
     }
-    instance.props = reactive2(props);
+    instance.props = reactive(props);
     instance.attrs = attrs;
+  }
+  var hasPropsChanged = (prevProps = {}, nextProps = {}) => {
+    let nextKeys = Object.keys(nextProps);
+    let prevKeys = Object.keys(prevProps);
+    if (nextKeys.length !== prevKeys.length) {
+      return true;
+    }
+    for (let i = 0; i < nextKeys.length; i++) {
+      let key = nextKeys[i];
+      if (nextProps[key] !== prevProps[key]) {
+        return true;
+      }
+    }
+    return false;
+  };
+  function updateProps(prevProps, nextProps) {
+    for (let key in nextProps) {
+      prevProps[key] = nextProps[key];
+    }
+    for (let key in prevProps) {
+      if (!hasOwn(nextProps, key)) {
+        delete prevProps[key];
+      }
+    }
   }
 
   // packages/runtime-core/src/component.ts
@@ -494,6 +518,11 @@ var VueRuntimeDOM = (() => {
       setupComponent(instance);
       setupRenderEffect(instance, container, anchor);
     };
+    let updateComponentPreRender = (instance, next) => {
+      instance.next = null;
+      instance.vnode = next;
+      updateProps(instance.props, next.props);
+    };
     function setupRenderEffect(instance, container, anchor) {
       let { render: render3 } = instance;
       let componentUpdateFn = () => {
@@ -503,6 +532,10 @@ var VueRuntimeDOM = (() => {
           instance.subTree = subTree;
           instance.isMounted = true;
         } else {
+          let { next } = instance;
+          if (next) {
+            updateComponentPreRender(instance, next);
+          }
           let subTree = render3.call(instance.proxy);
           patch(instance.subTree, subTree, container, anchor);
           instance.subTree = subTree;
@@ -512,10 +545,32 @@ var VueRuntimeDOM = (() => {
       let update = instance.update = effect2.run.bind(effect2);
       update();
     }
+    let shouldUpdateComponent = (n1, n2) => {
+      let { props: prevProps, children: prevChildren } = n1;
+      let { props: nextProps, children: nextChildren } = n2;
+      if (prevProps === nextProps) {
+        return false;
+      }
+      if (prevChildren || nextChildren) {
+        return true;
+      }
+      if (hasPropsChanged(prevProps, nextProps)) {
+        return true;
+      }
+      return false;
+    };
+    let updateComponent = (n1, n2, container) => {
+      let instnace = n2.component = n1.component;
+      if (shouldUpdateComponent(n1, n2)) {
+        instnace.next = n2;
+        instnace.update();
+      }
+    };
     let processComponent = (n1, n2, container, anchor) => {
       if (n1 == null) {
         mountComponent(n2, container, anchor);
       } else {
+        updateComponent(n1, n2, container);
       }
     };
     const patch = (n1, n2, container, anchor = null) => {

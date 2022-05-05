@@ -4,7 +4,7 @@ import { hasOwn, isArray, isString, ShapeFlags } from "@vue/shared";
 import { createComponentInstance, setupComponent } from "./component";
 
 
-import { initProps } from "./componentProps";
+import { hasPropsChanged, initProps, updateProps } from "./componentProps";
 import { queneJob } from "./scheduler";
 
 import { Text ,createVnode,isSameVnode, Fragment} from "./vnode";
@@ -269,6 +269,11 @@ export function createRenderer(renderOptions){
   
     }
 
+    let updateComponentPreRender = (instance,next)=>{
+        instance.next = null; // next清空
+        instance.vnode = next; // 实例上最新的虚拟节点
+        updateProps(instance.props,next.props)
+    }
     function setupRenderEffect(instance, container, anchor) {
         let { render } = instance;
         let componentUpdateFn = () => { // 传入响应式的方法,既有初始化,又有更新方法. 响应式是需要个函数,等到触发的时候要调用.
@@ -280,6 +285,12 @@ export function createRenderer(renderOptions){
     
                 instance.isMounted = true
             } else { // 组件内部更新 
+                let { next } = instance;
+                if(next){ // 更新前,也要需要拿到最新的属性 来进行更新
+                    updateComponentPreRender(instance,next)
+
+                }
+
                 let subTree = render.call(instance.proxy);
                 patch(instance.subTree, subTree, container, anchor); // 1. 老树就是实例上的树,新树就是从新new的树 patch会自动diff算法 
                 instance.subTree = subTree;
@@ -293,11 +304,45 @@ export function createRenderer(renderOptions){
         update()
     }
 
+    let shouldUpdateComponent = (n1,n2)=>{
+        // 1. 前后属性不一致更新=> 直接比对对象
+        // 2. 插槽的情况下,只要存在就直接更新
+        // 3. 比对是否个数/每个值有变化就更新
+        let {props : prevProps,children:prevChildren } = n1;
+        let {props : nextProps,children: nextChildren } = n2;
+        if(prevProps === nextProps){
+            return false
+        }
+        if(prevChildren || nextChildren){
+            return true; // 只要前后有插槽,就要强制更新
+        }
+        if(hasPropsChanged(prevProps,nextProps)){
+            return true
+        }
+        return false
+    }
+    let updateComponent = (n1,n2,container) =>{
+        // instance.props 是响应式的,可以更改后会触发渲染
+        // 因为是更新,所以组件实例可以直接复用. 可能是后面的更新点做修改就可以了.
+        let instnace =  (n2.component = n1.component) // 对于组件复用,组件复用实例. 对于元素(感觉是dom元素)来说,复用dom节点 
+
+        // updateProps(instnace,prevProps,nextProps); // 属性更新就可以了
+
+        if(shouldUpdateComponent(n1,n2)){
+            // 需要更新就强制调用属性的update即可
+            instnace.next = n2; // 存一下新的虚拟节点到next属性上
+            instnace.update(); // 如果应该更新,直接更新. 统一调用update方法
+        }
+
+
+        // 后续插槽更新,逻辑会写相同的两份
+    }
+
     let processComponent = (n1, n2, container,anchor) =>{ // 组件的更新/渲染 => 这里面区分函数式组件/状态组件 函数式组件是vue2的性能好且多节点 .但是到了vue3已经优化成了状态组件性能忽略不计且也可以多节点,所以多使用状态组件.
         if(n1 == null){ // 新增
             mountComponent(n2,container,anchor)
         }else{ // 更新更新靠的props
-
+            updateComponent(n1,n2,container)
         }
         
     }
